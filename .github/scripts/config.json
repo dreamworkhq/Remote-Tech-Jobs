@@ -5,28 +5,60 @@
   "tagline": "Fully remote software engineering, data, and security roles worldwide. Hybrid roles are excluded. When an employer limits remote work to a country or timezone, the location column says so.",
   "description": "Remote software engineering, data, and security jobs worldwide, updated daily with salaries. From 400,000+ crawled listings.",
   "homepage": "https://www.dreamworkhq.com/?utm_source=github&utm_medium=repo_homepage&utm_campaign=gh-remote-tech-jobs",
-  "topics": ["remote-jobs", "remote-work", "jobs", "job-search", "software-engineering", "work-from-home", "jobboard", "careers", "tech-jobs", "remote", "developer-jobs", "hiring", "digital-nomad", "engineering-jobs", "wfh"],
+  "topics": [
+    "remote-jobs",
+    "remote-work",
+    "jobs",
+    "job-search",
+    "software-engineering",
+    "work-from-home",
+    "jobboard",
+    "careers",
+    "tech-jobs",
+    "remote",
+    "developer-jobs",
+    "hiring",
+    "digital-nomad",
+    "engineering-jobs",
+    "wfh"
+  ],
   "utmCampaign": "gh-remote-tech-jobs",
   "keywords": "fully remote software engineering, data, and security roles worldwide",
   "sources": [
-    { "remote": "true", "function": "Engineering" },
-    { "remote": "true", "function": "Data Science" },
-    { "remote": "true", "function": "Security" }
+    {
+      "remote": "true",
+      "function": "Engineering"
+    },
+    {
+      "remote": "true",
+      "function": "Data Science"
+    },
+    {
+      "remote": "true",
+      "function": "Security"
+    }
   ],
   "usOnly": false,
   "titleInclude": "engineer|developer|architect|devops|\\bsre\\b|data|machine learning|\\bai\\b|security|cloud|software|platform|infra|scientist|analyst|\\bqa\\b|reliability",
   "titleExclude": "director|\\bvp\\b|head of|chief",
-  "windowDays": 7,
-  "maxRows": 300,
-  "minWindowRows": 100,
+  "maxRows": 600,
   "minRows": 25,
-  "maxPagesPerSource": 40,
+  "maxPagesPerSource": 60,
   "groupBy": "functionPrimary",
   "showAiColumn": false,
   "siblings": [
-    { "repo": "dreamworkhq/New-Grad-Software-Engineer-Jobs", "label": "New Grad Software Engineer Jobs: entry-level roles for graduates" },
-    { "repo": "dreamworkhq/Tech-Internships-2026", "label": "Tech Internships 2026: SWE, data, product, and design internships" },
-    { "repo": "dreamworkhq/AI-ML-Jobs", "label": "AI and ML Jobs: AI-first roles, classified daily" }
+    {
+      "repo": "dreamworkhq/New-Grad-Software-Engineer-Jobs",
+      "label": "New Grad Software Engineer Jobs: entry-level roles for graduates"
+    },
+    {
+      "repo": "dreamworkhq/Tech-Internships-2026",
+      "label": "Tech Internships 2026: SWE, data, product, and design internships"
+    },
+    {
+      "repo": "dreamworkhq/AI-ML-Jobs",
+      "label": "AI and ML Jobs: AI-first roles, classified daily"
+    }
   ],
   "faq": [
     {
@@ -45,5 +77,6 @@
       "q": "Can a tool apply to these for me?",
       "a": "Yes. <a href=\"https://www.dreamworkhq.com/?utm_source=github&utm_medium=faq&utm_campaign=gh-remote-tech-jobs\">Dreamwork</a> matches your resume against every listing here, tailors each application, and can submit them for you. Seeing your matches is free."
     }
-  ]
+  ],
+  "mode": "fresh"
 }
