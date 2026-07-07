@@ -334,9 +334,9 @@ Rather not scan a table? [Dreamwork](https://www.dreamworkhq.com/?utm_source=git
 
 ## More daily lists
 
-- [New Grad Software Engineer Jobs: entry-level roles for graduates](https://github.com/ponder-surveys/New-Grad-Software-Engineer-Jobs)
-- [Tech Internships 2026: SWE, data, product, and design internships](https://github.com/ponder-surveys/Tech-Internships-2026)
-- [AI and ML Jobs: AI-first roles, classified daily](https://github.com/ponder-surveys/AI-ML-Jobs)
+- [New Grad Software Engineer Jobs: entry-level roles for graduates](https://github.com/dreamworkhq/New-Grad-Software-Engineer-Jobs)
+- [Tech Internships 2026: SWE, data, product, and design internships](https://github.com/dreamworkhq/Tech-Internships-2026)
+- [AI and ML Jobs: AI-first roles, classified daily](https://github.com/dreamworkhq/AI-ML-Jobs)
 - [Dreamwork Research, live hiring data](https://www.dreamworkhq.com/research?utm_source=github&utm_medium=readme_links&utm_campaign=gh-remote-tech-jobs)
 - [AI Labor Index](https://www.dreamworkhq.com/research/ai?utm_source=github&utm_medium=readme_links&utm_campaign=gh-remote-tech-jobs)
 

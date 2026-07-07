@@ -1,6 +1,6 @@
 {
   "repo": "Remote-Tech-Jobs",
-  "owner": "ponder-surveys",
+  "owner": "dreamworkhq",
   "title": "Remote Tech Jobs",
   "tagline": "Fully remote software engineering, data, and security roles worldwide. Hybrid roles are excluded. When an employer limits remote work to a country or timezone, the location column says so.",
   "description": "Remote software engineering, data, and security jobs worldwide, updated daily with salaries. From 400,000+ crawled listings.",
@@ -24,9 +24,9 @@
   "groupBy": "functionPrimary",
   "showAiColumn": false,
   "siblings": [
-    { "repo": "ponder-surveys/New-Grad-Software-Engineer-Jobs", "label": "New Grad Software Engineer Jobs: entry-level roles for graduates" },
-    { "repo": "ponder-surveys/Tech-Internships-2026", "label": "Tech Internships 2026: SWE, data, product, and design internships" },
-    { "repo": "ponder-surveys/AI-ML-Jobs", "label": "AI and ML Jobs: AI-first roles, classified daily" }
+    { "repo": "dreamworkhq/New-Grad-Software-Engineer-Jobs", "label": "New Grad Software Engineer Jobs: entry-level roles for graduates" },
+    { "repo": "dreamworkhq/Tech-Internships-2026", "label": "Tech Internships 2026: SWE, data, product, and design internships" },
+    { "repo": "dreamworkhq/AI-ML-Jobs", "label": "AI and ML Jobs: AI-first roles, classified daily" }
   ],
   "faq": [
     {
