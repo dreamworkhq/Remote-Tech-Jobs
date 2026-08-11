@@ -147,17 +147,34 @@ async function fetchSource(source, config) {
     const data = await fetchJson(`${API_BASE}/listings?${params}`);
     const rows = data.listings ?? [];
     for (const row of rows) {
-      if (keepRow(row, config)) collected.push(row);
+      if (keepRow(row, config, source)) collected.push(row);
     }
-    if (rows.length < PAGE_SIZE) break; // last page
+    const hasExactTotal = data.totalCapped !== true && Number.isFinite(data.total);
+    const reachedReportedEnd =
+      hasExactTotal && (page + 1) * PAGE_SIZE >= data.total;
+    // Hydration can drop a listing that retires between the API's id query and
+    // detail query, so an exact-total page may be short before the reported
+    // end. Inventory mode therefore requires an exact reported end. Fresh
+    // feeds may still use a short capped/unknown page as their display stop.
+    const freshFeedReachedShortPage =
+      config.mode !== "inventory" && !hasExactTotal && rows.length < PAGE_SIZE;
+    if (reachedReportedEnd || freshFeedReachedShortPage) {
+      return collected;
+    }
     if (collected.length >= wanted) break;
+  }
+  if (config.mode === "inventory") {
+    const sourceLabel = source.function ?? JSON.stringify(source);
+    throw new Error(
+      `Inventory source pagination limit reached for ${sourceLabel} after ${maxPages} pages. Increase maxPagesPerSource or narrow the source; refusing to publish a partial inventory.`,
+    );
   }
   return collected;
 }
 
 // US/non-US partitioning happens after fetch (international rows feed
 // INTERNATIONAL.md), so keepRow only applies the audience filters.
-function keepRow(row, config) {
+function keepRow(row, config, source) {
   if (!row?.id || !row.title || !row.companyName) return false;
   // Staffing-agency reposts hide the employer behind "Confidential Employer"
   // or a machine-suffixed name like "Superloop 1733718881"; a public list
@@ -165,7 +182,11 @@ function keepRow(row, config) {
   if (/\bconfidential\b/i.test(row.companyName)) return false;
   if (/\b\d{9,}\b/.test(row.companyName)) return false;
   if (config.titleInclude && !new RegExp(config.titleInclude, "i").test(row.title)) return false;
+  const scopedFunctions = config.titleIncludeAllSourceFunctions;
+  const applyTitleIncludeAll =
+    !Array.isArray(scopedFunctions) || scopedFunctions.includes(source.function);
   if (
+    applyTitleIncludeAll &&
     config.titleIncludeAll &&
     !config.titleIncludeAll.every((pattern) =>
       new RegExp(pattern, "i").test(row.title),
@@ -190,6 +211,97 @@ const NON_US_LOCATION = new RegExp(
   "i",
 );
 
+// Complete ISO-3166 alpha-3 set, mirrored from the API's CI-checked
+// ISO_ALPHA3_TO_ALPHA2 mapping. Keep this standalone generator dependency-free.
+const NON_US_ISO_ALPHA3_COUNTRY_CODES = new Set(
+  (
+    "ABW AFG AGO AIA ALA ALB AND ARE ARG ARM ASM ATA ATF ATG AUS AUT " +
+    "AZE BDI BEL BEN BES BFA BGD BGR BHR BHS BIH BLM BLR BLZ BMU BOL " +
+    "BRA BRB BRN BTN BVT BWA CAF CAN CCK CHE CHL CHN CIV CMR COD COG " +
+    "COK COL COM CPV CRI CUB CUW CXR CYM CYP CZE DEU DJI DMA DNK DOM " +
+    "DZA ECU EGY ERI ESH ESP EST ETH FIN FJI FLK FRA FRO FSM GAB GBR " +
+    "GEO GGY GHA GIB GIN GLP GMB GNB GNQ GRC GRD GRL GTM GUF GUM GUY " +
+    "HKG HMD HND HRV HTI HUN IDN IMN IND IOT IRL IRN IRQ ISL ISR ITA " +
+    "JAM JEY JOR JPN KAZ KEN KGZ KHM KIR KNA KOR KWT LAO LBN LBR LBY " +
+    "LCA LIE LKA LSO LTU LUX LVA MAC MAF MAR MCO MDA MDG MDV MEX MHL " +
+    "MKD MLI MLT MMR MNE MNG MNP MOZ MRT MSR MTQ MUS MWI MYS MYT NAM " +
+    "NCL NER NFK NGA NIC NIU NLD NOR NPL NRU NZL OMN PAK PAN PCN PER " +
+    "PHL PLW PNG POL PRI PRK PRT PRY PSE PYF QAT REU ROU RUS RWA SAU " +
+    "SDN SEN SGP SGS SHN SJM SLB SLE SLV SMR SOM SPM SRB SSD STP SUR " +
+    "SVK SVN SWE SWZ SXM SYC SYR TCA TCD TGO THA TJK TKL TKM TLS TON " +
+    "TTO TUN TUR TUV TWN TZA UGA UKR UMI URY USA UZB VAT VCT VEN VGB " +
+    "VIR VNM VUT WLF WSM YEM ZAF ZMB ZWE"
+  )
+    .split(" ")
+    .filter((code) => code !== "USA"),
+);
+const STRUCTURED_ALPHA3_LOCATION_PREFIX =
+  /^([A-Z]{3})\s*[-–]\s*[A-Z0-9]{1,3}\s*[-–]\s*\S/i;
+
+function hasExplicitNonUsAlpha3Country(location) {
+  const match = location.match(STRUCTURED_ALPHA3_LOCATION_PREFIX);
+  return (
+    match !== null &&
+    NON_US_ISO_ALPHA3_COUNTRY_CODES.has(match[1].toUpperCase())
+  );
+}
+
+const ISO_ALPHA2_COUNTRY_CODES = (
+  "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ " +
+  "BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ " +
+  "CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ " +
+  "DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR " +
+  "GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY " +
+  "HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP " +
+  "KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY " +
+  "MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ " +
+  "NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN " +
+  "PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL " +
+  "SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR " +
+  "TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW"
+).split(" ");
+const ENGLISH_REGION_NAMES = new Intl.DisplayNames(["en"], { type: "region" });
+
+function countryNameKey(value) {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[.’']/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+const NON_US_COUNTRY_NAMES = new Set(
+  ISO_ALPHA2_COUNTRY_CODES
+    .filter((code) => code !== "US")
+    .map((code) => countryNameKey(ENGLISH_REGION_NAMES.of(code))),
+);
+// Common English alternatives for names emitted differently by ICU.
+for (const name of [
+  "Cape Verde", "Czech Republic", "East Timor", "Ivory Coast",
+  "North Korea", "Palestine", "Republic of the Congo", "Russia",
+  "South Korea", "Syria", "Taiwan", "Turkey", "UAE", "UK", "Vatican City",
+  "Vietnam",
+]) {
+  NON_US_COUNTRY_NAMES.add(countryNameKey(name));
+}
+// "Georgia" can be a US state in exactly the same trailing-name position.
+NON_US_COUNTRY_NAMES.delete(countryNameKey("Georgia"));
+
+function hasExplicitForeignCountryName(location) {
+  const candidates = [];
+  const trailing = location.match(/(?:,\s*|\(\s*)([^,()]+?)\s*\)?\s*$/);
+  if (trailing) candidates.push(trailing[1]);
+  const leadingStructured = location.match(
+    /^(.+?)\s+[-–]\s+[^-–]+\s+[-–]\s+/,
+  );
+  if (leadingStructured) candidates.push(leadingStructured[1]);
+  return candidates.some((name) =>
+    NON_US_COUNTRY_NAMES.has(countryNameKey(name)),
+  );
+}
+
 // Unambiguous US markers for locations that carry no state code, e.g. a bare
 // "Austin" or "Round Rock, Texas". Deliberately omits names that collide with
 // non-US places (Cambridge, Birmingham, Durham, Aurora, Alexandria, Georgia).
@@ -211,8 +323,15 @@ const US_LOCATION = new RegExp(
  * and reject anything carrying a known foreign city/country marker first.)
  */
 function looksUnitedStates(row) {
-  if (row.locationCountryCode) return row.locationCountryCode === "US";
   const loc = row.location ?? "";
+  if (
+    loc &&
+    (hasExplicitNonUsAlpha3Country(loc) ||
+      hasExplicitForeignCountryName(loc))
+  ) {
+    return false;
+  }
+  if (row.locationCountryCode) return row.locationCountryCode === "US";
   if (!loc) return false;
   if (/\b(united states|usa|u\.s\.)\b/i.test(loc)) return true;
   if (NON_US_LOCATION.test(loc)) return false;
@@ -239,6 +358,30 @@ function dedupe(rows) {
   );
 }
 
+function selectLinkEligibleRows(rows, config) {
+  if (config.linkMode !== "source") return rows;
+  const minimum = config.minDirectLinkCoverageRatio;
+  if (!Number.isFinite(minimum) || minimum <= 0 || minimum > 1) {
+    throw new Error(
+      "source link mode requires minDirectLinkCoverageRatio between 0 and 1",
+    );
+  }
+  const directRows = rows.filter((row) => directSourceUrl(row));
+  const excluded = rows.length - directRows.length;
+  const ratio = rows.length === 0 ? 0 : directRows.length / rows.length;
+  if (ratio < minimum) {
+    throw new Error(
+      `Direct-link coverage collapsed: ${directRows.length} of ${rows.length} eligible rows (${(ratio * 100).toFixed(1)}%; minimum ${(minimum * 100).toFixed(1)}%). Refusing to overwrite the list.`,
+    );
+  }
+  if (excluded > 0) {
+    console.warn(
+      `${config.repo}: excluded ${excluded} rows without valid direct source URLs (${(ratio * 100).toFixed(1)}% retained)`,
+    );
+  }
+  return directRows;
+}
+
 // ---------- rendering ----------
 
 function esc(text) {
@@ -253,14 +396,64 @@ function truncate(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-// Row links carry only source+campaign: at inventory scale (~900 rows) every
-// utm byte counts against GitHub's ~500 KiB markdown render cutoff.
+function isCommunityPresentation(config) {
+  return config.presentation === "community";
+}
+
+function directSourceUrl(row) {
+  const source = typeof row.sourceUrl === "string" ? row.sourceUrl : "";
+  if (/[\u0000-\u001f\u007f]/.test(source)) return null;
+  const raw = source.trim();
+  if (!raw || /\s/u.test(raw)) return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (parsed.username || parsed.password) return null;
+    const hostname = parsed.hostname.toLowerCase().replace(/\.+$/, "");
+    if (!hostname) return null;
+    if (
+      hostname === "dreamworkhq.com" ||
+      hostname.endsWith(".dreamworkhq.com")
+    ) {
+      return null;
+    }
+    parsed.hostname = hostname;
+    const encodeMarkdownDestination = (component) =>
+      component.replace(/[()[\]\\|]/g, (character) =>
+        `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+      );
+    const candidate =
+      `${parsed.protocol}//${parsed.host}` +
+      encodeMarkdownDestination(parsed.pathname) +
+      encodeMarkdownDestination(parsed.search) +
+      encodeMarkdownDestination(parsed.hash);
+    const reparsed = new URL(candidate);
+    if (
+      (reparsed.protocol !== "http:" && reparsed.protocol !== "https:") ||
+      reparsed.username ||
+      reparsed.password
+    ) {
+      return null;
+    }
+    return reparsed.href;
+  } catch {
+    return null;
+  }
+}
+
 function jobUrl(row, config) {
+  if (config.linkMode === "source") {
+    const sourceUrl = directSourceUrl(row);
+    if (!sourceUrl) {
+      throw new Error(`Listing ${row.id ?? "(missing id)"} has no valid direct source URL`);
+    }
+    return sourceUrl;
+  }
   return `${SITE_BASE}/job/${row.id}?utm_source=github&utm_campaign=${config.utmCampaign}`;
 }
 
 function companyUrl(row, config) {
-  if (!row.companyDomain) return null;
+  if (isCommunityPresentation(config) || !row.companyDomain) return null;
   return `${SITE_BASE}/c/${row.companyDomain}?utm_source=github&utm_campaign=${config.utmCampaign}`;
 }
 
@@ -380,7 +573,7 @@ function renderSections(rows, config, now) {
   return { toc: `${toc}\n`, body };
 }
 
-function renderReadme(rows, config, now) {
+function renderGrowthReadme(rows, config, now) {
   const updated = now.toISOString().slice(0, 10);
   const matchesUrl = `${SITE_BASE}/?utm_source=github&utm_medium=readme_cta&utm_campaign=${config.utmCampaign}`;
   const { toc, body } = renderSections(rows, config, now);
@@ -478,6 +671,58 @@ A [GitHub Action](.github/workflows/update.yml) runs once a day. It queries Drea
 `;
 }
 
+function representedCompanyCount(rows) {
+  return new Set(
+    rows.map((row) => String(row.companyName).trim().toLowerCase()),
+  ).size;
+}
+
+function addedInLast24Hours(rows, now) {
+  const nowMs = now.getTime();
+  const cutoffMs = nowMs - 24 * 60 * 60 * 1000;
+  return rows.filter((row) => {
+    const createdMs = new Date(row.createdAt).getTime();
+    return (
+      Number.isFinite(createdMs) &&
+      createdMs >= cutoffMs &&
+      createdMs <= nowMs
+    );
+  }).length;
+}
+
+function renderCommunityReadme(rows, config, now) {
+  const updated = now.toISOString().slice(0, 10);
+  const companies = representedCompanyCount(rows);
+  const addedToday = addedInLast24Hours(rows, now);
+  const { toc, body } = renderSections(rows, config, now);
+  return `# ${config.title}
+
+${config.tagline}
+
+**${rows.length} open internships** · **${companies} companies** · **${addedToday} added in the last 24 hours** · Updated **${updated}**
+
+Indexed from company career pages and maintained by [Dreamwork](https://github.com/dreamworkhq).
+
+${toc ? `${toc}\n` : ""}<!-- TABLE_START (auto-generated: do not edit by hand; edits are overwritten daily) -->
+
+${body}
+
+<!-- TABLE_END -->
+
+## How this list is built
+
+A [GitHub Action](.github/workflows/update.yml) refreshes this list once a day from Dreamwork's public job index. It filters for ${config.keywords}, removes duplicates, and drops listings after the crawler can no longer verify that they are open. The raw snapshot is available in [\`data/listings.json\`](data/listings.json).
+
+Found a bad or missing listing? [Open an issue](../../issues).
+`;
+}
+
+function renderReadme(rows, config, now) {
+  return isCommunityPresentation(config)
+    ? renderCommunityReadme(rows, config, now)
+    : renderGrowthReadme(rows, config, now);
+}
+
 function renderIntl(rows, config, now) {
   const updated = now.toISOString().slice(0, 10);
   const matchesUrl = `${SITE_BASE}/?utm_source=github&utm_medium=intl_readme&utm_campaign=${config.utmCampaign}`;
@@ -516,7 +761,10 @@ function renderJson(rows, config, now) {
   return `${JSON.stringify(
     {
       generatedAt: now.toISOString(),
-      source: "https://www.dreamworkhq.com",
+      source:
+        config.linkMode === "source"
+          ? "dreamwork-public-job-index"
+          : "https://www.dreamworkhq.com",
       list: config.repo,
       count: rows.length,
       listings: rows.map((row) => {
@@ -624,22 +872,10 @@ config.totalMatchingCapped = totalMatchingCapped;
 // inventory mode: every verified-open matching role (US in README,
 // the rest in INTERNATIONAL.md). fresh mode: the newest maxRows.
 const deduped = dedupe(all);
-const minCoverageRatio = config.minUpstreamCoverageRatio;
-if (
-  config.mode === "inventory" &&
-  Number.isFinite(minCoverageRatio) &&
-  minCoverageRatio > 0 &&
-  minCoverageRatio <= 1 &&
-  totalMatching > 0 &&
-  deduped.length / totalMatching < minCoverageRatio
-) {
-  throw new Error(
-    `Upstream coverage collapsed: ${deduped.length} filtered unique rows from ${totalMatching} matching upstream (${(deduped.length / totalMatching * 100).toFixed(1)}%; minimum ${(minCoverageRatio * 100).toFixed(1)}%). Refusing to overwrite the list.`,
-  );
-}
-const usRows = deduped.filter((r) => looksUnitedStates(r));
-const intlRows = deduped.filter((r) => !looksUnitedStates(r));
-let readmeRows = config.usOnly ? usRows : deduped;
+const linkEligibleRows = selectLinkEligibleRows(deduped, config);
+const usRows = linkEligibleRows.filter((row) => looksUnitedStates(row));
+const intlRows = linkEligibleRows.filter((row) => !looksUnitedStates(row));
+let readmeRows = config.usOnly ? usRows : linkEligibleRows;
 if (config.mode !== "inventory") {
   readmeRows = readmeRows.slice(0, config.maxRows ?? 600);
 }
