@@ -150,12 +150,21 @@ async function fetchSource(source, config) {
       if (keepRow(row, config, source)) collected.push(row);
     }
     const hasExactTotal = data.totalCapped !== true && Number.isFinite(data.total);
+    if (config.mode === "inventory" && !hasExactTotal) {
+      const sourceLabel = source.search
+        ? `${source.function ?? "source"} (${source.search})`
+        : source.function ?? JSON.stringify(source);
+      throw new Error(
+        `Inventory source total is capped or unavailable for ${sourceLabel}. Narrow the source into exact subqueries; refusing to publish a partial inventory.`,
+      );
+    }
     const reachedReportedEnd =
       hasExactTotal && (page + 1) * PAGE_SIZE >= data.total;
     // Hydration can drop a listing that retires between the API's id query and
     // detail query, so an exact-total page may be short before the reported
-    // end. Inventory mode therefore requires an exact reported end. Fresh
-    // feeds may still use a short capped/unknown page as their display stop.
+    // end. Inventory mode requires an exact reported end because the public
+    // API returns an empty page at its hard offset ceiling even when more rows
+    // exist. Fresh feeds may use a short capped/unknown page as their stop.
     const freshFeedReachedShortPage =
       config.mode !== "inventory" && !hasExactTotal && rows.length < PAGE_SIZE;
     if (reachedReportedEnd || freshFeedReachedShortPage) {
