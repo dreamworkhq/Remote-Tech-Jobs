@@ -40,6 +40,7 @@
   ],
   "usOnly": false,
   "titleInclude": "engineer|developer|architect|devops|\\bsre\\b|data|machine learning|\\bai\\b|security|cloud|software|platform|infra|scientist|analyst|\\bqa\\b|reliability",
+  "companyExclude": "^ITOL Recruit$",
   "titleExclude": "director|\\bvp\\b|head of|chief",
   "maxRows": 600,
   "minRows": 25,
